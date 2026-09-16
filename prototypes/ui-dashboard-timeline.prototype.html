@@ -1,0 +1,630 @@
+<!--
+  PROTOTYPE — throwaway. Answers wayfinder ticket #8:
+  "What should the dashboard (all Tournaments) and timeline (one Tournament's
+  Rounds/Matches) look like, r/Unixporn-inspired?"
+
+  Three structurally different variants (?variant=A|B|C), two pages
+  (?page=dashboard|timeline) — flip with the floating bar / arrow keys,
+  or the page toggle top-right. No build step: just double-click this file.
+
+  Mock data only, no persistence, no real app code touched.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ttt — UI prototype (wayfinder #8)</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #11161d;
+    --border: #2a323d;
+    --text: #d6dde5;
+    --muted: #7a8494;
+    --accent: #7dd3a8;
+    --accent2: #e8b360;
+    --accent3: #7aa2e8;
+    --danger: #e07a7a;
+    --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", ui-monospace, "Courier New", monospace;
+    --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+  #app { min-height: 100vh; padding-bottom: 70px; }
+
+  /* ---------- page toggle (top right, shared) ---------- */
+  #page-toggle {
+    position: fixed; top: 12px; right: 12px; z-index: 200;
+    display: flex; gap: 2px; background: #000a; border: 1px solid var(--border);
+    border-radius: 8px; padding: 3px; font-family: var(--mono); font-size: 12px;
+  }
+  #page-toggle button {
+    background: transparent; border: none; color: var(--muted);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  }
+  #page-toggle button.active { background: var(--accent); color: #04140c; font-weight: 600; }
+
+  /* ---------- floating variant switcher (shared) ---------- */
+  #switcher {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 200;
+    display: flex; align-items: center; gap: 10px;
+    background: #000c; border: 1px solid #ffffff33;
+    border-radius: 999px; padding: 8px 10px;
+    box-shadow: 0 8px 30px #000a;
+    font-family: var(--mono); font-size: 13px;
+  }
+  #switcher button {
+    background: #ffffff14; border: 1px solid #ffffff22; color: var(--text);
+    width: 28px; height: 28px; border-radius: 999px; cursor: pointer;
+    font-size: 14px; line-height: 1;
+  }
+  #switcher button:hover { background: #ffffff2a; }
+  #switcher .label { min-width: 190px; text-align: center; color: var(--accent2); }
+  #switcher .label b { color: #fff; }
+
+  h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+  a { color: inherit; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+
+  /* ============================================================
+     VARIANT A — tiling window manager (i3/sway workspaces + panes)
+     ============================================================ */
+  .A-root { font-family: var(--mono); font-size: 13px; }
+  .A-bar {
+    display: flex; align-items: center; gap: 0; background: #05070a;
+    border-bottom: 1px solid var(--border); padding: 0 10px; height: 34px;
+  }
+  .A-bar .ws {
+    padding: 0 14px; height: 34px; display: flex; align-items: center;
+    color: var(--muted); border-right: 1px solid var(--border);
+  }
+  .A-bar .ws.active { color: #04140c; background: var(--accent); font-weight: 700; }
+  .A-bar .spacer { flex: 1; }
+  .A-bar .status { color: var(--muted); padding: 0 10px; }
+  .A-bar .status b { color: var(--accent2); }
+
+  .A-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; }
+  .A-pane {
+    border: 1px solid var(--border); background: var(--panel);
+    display: flex; flex-direction: column; min-height: 220px;
+  }
+  .A-pane.focused { border-color: var(--accent); }
+  .A-titlebar {
+    background: #171d26; border-bottom: 1px solid var(--border);
+    padding: 4px 8px; display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .A-pane.focused .A-titlebar { background: #14251d; color: var(--accent); }
+  .A-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .A-dot.running { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .A-dot.completed { background: var(--muted); }
+  .A-dot.created { background: var(--accent3); }
+  .A-body { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .A-subpane {
+    border: 1px dashed var(--border); padding: 5px 7px; font-size: 12px;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .A-subpane .name { color: var(--text); }
+  .A-subpane .meta { color: var(--muted); white-space: nowrap; }
+  .A-tag { border: 1px solid var(--border); padding: 0 5px; border-radius: 2px; font-size: 10px; color: var(--muted); }
+
+  .A-timeline-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 10px; padding: 10px; overflow-x: auto; }
+  .A-stagecol { border: 1px solid var(--border); background: var(--panel); }
+  .A-stagecol > .A-titlebar { background: #171d26; }
+  .A-roundpane { border-top: 1px solid var(--border); padding: 8px; }
+  .A-roundpane h4 { color: var(--accent2); font-size: 12px; margin-bottom: 6px; }
+  .A-match { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; border-bottom: 1px solid #1c232c; }
+  .A-match:last-child { border-bottom: none; }
+  .A-match .winner { color: var(--accent); font-weight: 700; }
+  .A-match .score { color: var(--muted); }
+  .A-standing { width: 100%; font-size: 11px; border-collapse: collapse; }
+  .A-standing th, .A-standing td { text-align: left; padding: 2px 4px; border-bottom: 1px solid #1c232c; }
+  .A-standing th { color: var(--muted); font-weight: 400; }
+
+  /* ============================================================
+     VARIANT B — terminal / btop-style status feed
+     ============================================================ */
+  .B-root { font-family: var(--mono); font-size: 13px; background: #060708; }
+  .B-topbar {
+    display: flex; gap: 24px; padding: 10px 16px; border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .B-topbar .stat b { color: var(--accent); font-size: 15px; }
+  .B-panel { margin: 12px 16px; border: 1px solid var(--border); }
+  .B-panel .hdr {
+    display: flex; justify-content: space-between; padding: 5px 10px;
+    background: #0d1117; border-bottom: 1px solid var(--border); color: var(--accent2);
+  }
+  .B-row {
+    display: grid; grid-template-columns: 90px 1fr 130px 90px 60px; gap: 10px;
+    padding: 7px 10px; border-bottom: 1px solid #14181d; align-items: center;
+  }
+  .B-row:last-child { border-bottom: none; }
+  .B-row .st { text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+  .B-row .st.running { color: var(--accent); }
+  .B-row .st.completed { color: var(--muted); }
+  .B-row .st.created { color: var(--accent3); }
+  .B-bar { font-family: var(--mono); letter-spacing: -1px; color: var(--accent); white-space: pre; }
+  .B-bar span { color: #262c33; }
+
+  .B-feed { padding: 6px 10px; }
+  .B-feed-round { margin: 10px 0 4px; color: var(--accent2); }
+  .B-line { padding: 2px 0 2px 4px; color: var(--muted); white-space: normal; }
+  .B-line .tree { color: #3a4250; }
+  .B-line .p1, .B-line .p2 { color: var(--text); }
+  .B-line .win { color: var(--accent); }
+  .B-line .score { color: var(--muted); }
+  .B-standing-inline { padding: 8px 10px 12px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .B-group-block h5 { color: var(--accent2); font-size: 12px; margin: 0 0 4px; }
+  .B-group-row { display: grid; grid-template-columns: 18px 130px 90px; gap: 6px; font-size: 12px; color: var(--muted); }
+  .B-group-row .blocks { color: var(--accent); letter-spacing: -1px; }
+
+  /* ============================================================
+     VARIANT C — bento / rainmeter-style widget wall
+     ============================================================ */
+  .C-root { font-family: var(--sans); padding: 16px; }
+  .C-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .C-stat {
+    background: linear-gradient(160deg, #17202b, #0f151d); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 16px;
+  }
+  .C-stat .num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .C-stat .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+
+  .C-bento { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .C-card {
+    border-radius: 16px; padding: 16px; border: 1px solid var(--border);
+    background: #121821; position: relative; overflow: hidden;
+  }
+  .C-card::before {
+    content: ""; position: absolute; top: 0; left: 0; width: 6px; height: 100%;
+  }
+  .C-card.running::before { background: var(--accent); }
+  .C-card.completed::before { background: var(--muted); }
+  .C-card.created::before { background: var(--accent3); }
+  .C-card h3 { font-size: 17px; margin-bottom: 2px; }
+  .C-card .dates { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .C-pill {
+    display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px;
+  }
+  .C-card.running .C-pill { background: #1c3a2c; color: var(--accent); }
+  .C-card.completed .C-pill { background: #2a2f36; color: var(--muted); }
+  .C-card.created .C-pill { background: #1c2c44; color: var(--accent3); }
+  .C-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .C-chip { background: #1c232c; border-radius: 8px; padding: 5px 9px; font-size: 12px; color: var(--text); }
+  .C-chip .n { color: var(--muted); }
+
+  .C-timeline-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .C-groups { display: flex; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .C-group-card { flex: 1; min-width: 260px; background: #121821; border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .C-group-card h4 { color: var(--accent2); margin-bottom: 8px; }
+  table.C-standing { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.C-standing th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; padding: 4px 6px; }
+  table.C-standing td { padding: 5px 6px; border-top: 1px solid #1c232c; }
+  table.C-standing tr:first-child td { color: var(--accent); font-weight: 600; }
+
+  .C-bracket-wrap { background: #121821; border: 1px solid var(--border); border-radius: 14px; padding: 20px; overflow-x: auto; }
+  .C-bracket-wrap h4 { color: var(--accent2); margin-bottom: 14px; }
+
+  /* small helper for empty things */
+  .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="page-toggle">
+  <button data-page="dashboard">Dashboard</button>
+  <button data-page="timeline">Timeline</button>
+</div>
+
+<div id="app"></div>
+
+<div id="switcher">
+  <button id="prev">←</button>
+  <div class="label" id="switch-label"></div>
+  <button id="next">→</button>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Mock domain data (Tournament > Category > Stage > Round > Match)
+   --------------------------------------------------------------- */
+const tournaments = [
+  {
+    id: "t1", name: "Herbstpokal 2026", dates: "19.–20. Sep 2026", status: "running",
+    categories: [
+      { name: "Herren Einzel U18", entrants: 8, stages: 2 },
+      { name: "Damen Doppel Open", entrants: 12, stages: 1 },
+      { name: "Herren Einzel Open", entrants: 16, stages: 1 },
+    ],
+  },
+  {
+    id: "t2", name: "Frühjahrsturnier 2026", dates: "12.–13. Apr 2026", status: "completed",
+    categories: [
+      { name: "Mixed Doppel", entrants: 10, stages: 1 },
+      { name: "Herren Einzel U18", entrants: 6, stages: 2 },
+    ],
+  },
+  {
+    id: "t3", name: "Winterpokal 2026", dates: "6.–7. Dez 2026", status: "created",
+    categories: [
+      { name: "Herren Einzel Open", entrants: 0, stages: 1 },
+      { name: "Damen Einzel Open", entrants: 0, stages: 1 },
+    ],
+  },
+];
+
+// Detail for the Timeline page: Tournament t1, Category "Herren Einzel U18"
+// Stage 1: Gruppensystem (Group A / Group B, round-robin) — completed
+// Stage 2: Einfaches K.-o.-System (Semifinal, Final) — in progress
+const timelineDetail = {
+  tournament: "Herbstpokal 2026",
+  category: "Herren Einzel U18",
+  stage1: {
+    name: "Stage 1 — Gruppensystem",
+    groups: [
+      {
+        name: "Group A",
+        standing: [
+          { name: "T. Baumann", w: 3, l: 0, diff: "+9" },
+          { name: "L. Weber", w: 2, l: 1, diff: "+3" },
+          { name: "F. Krüger", w: 1, l: 2, diff: "-4" },
+          { name: "J. Nowak", w: 0, l: 3, diff: "-8" },
+        ],
+      },
+      {
+        name: "Group B",
+        standing: [
+          { name: "S. Richter", w: 3, l: 0, diff: "+8" },
+          { name: "M. Hoffmann", w: 2, l: 1, diff: "+2" },
+          { name: "D. Zimmer", w: 1, l: 2, diff: "-3" },
+          { name: "P. Adler", w: 0, l: 3, diff: "-7" },
+        ],
+      },
+    ],
+    rounds: [
+      { name: "Matchday 1", matches: [
+        { a: "T. Baumann", b: "F. Krüger", score: "3:1", winner: "a", group: "A" },
+        { a: "L. Weber", b: "J. Nowak", score: "3:0", winner: "a", group: "A" },
+        { a: "S. Richter", b: "D. Zimmer", score: "3:0", winner: "a", group: "B" },
+        { a: "M. Hoffmann", b: "P. Adler", score: "3:2", winner: "a", group: "B" },
+      ]},
+      { name: "Matchday 2", matches: [
+        { a: "T. Baumann", b: "L. Weber", score: "3:2", winner: "a", group: "A" },
+        { a: "F. Krüger", b: "J. Nowak", score: "3:1", winner: "a", group: "A" },
+        { a: "S. Richter", b: "M. Hoffmann", score: "3:1", winner: "a", group: "B" },
+        { a: "D. Zimmer", b: "P. Adler", score: "3:1", winner: "a", group: "B" },
+      ]},
+      { name: "Matchday 3", matches: [
+        { a: "T. Baumann", b: "J. Nowak", score: "3:0", winner: "a", group: "A" },
+        { a: "L. Weber", b: "F. Krüger", score: "3:1", winner: "a", group: "A" },
+        { a: "S. Richter", b: "P. Adler", score: "3:0", winner: "a", group: "B" },
+        { a: "M. Hoffmann", b: "D. Zimmer", score: "3:2", winner: "a", group: "B" },
+      ]},
+    ],
+  },
+  stage2: {
+    name: "Stage 2 — Einfaches K.-o.-System",
+    rounds: [
+      { name: "Halbfinale", matches: [
+        { a: "T. Baumann", b: "M. Hoffmann", score: "3:1", winner: "a", from: "Sieger Gruppe A #1 vs. Gruppe B #2" },
+        { a: "S. Richter", b: "L. Weber", score: null, winner: null, from: "Sieger Gruppe B #1 vs. Gruppe A #2" },
+      ]},
+      { name: "Finale", matches: [
+        { a: "T. Baumann", b: "—", score: null, winner: null, from: "Sieger Halbfinale 1 vs. Sieger Halbfinale 2" },
+      ]},
+    ],
+  },
+};
+
+/* ---------------------------------------------------------------
+   State + routing (?page=, ?variant=) — plain history API, works
+   fine over file:// too.
+   --------------------------------------------------------------- */
+const VARIANTS = [
+  { key: "A", name: "Tiling panes" },
+  { key: "B", name: "Terminal feed" },
+  { key: "C", name: "Bento wall" },
+];
+const PAGES = ["dashboard", "timeline"];
+
+function getState() {
+  const p = new URLSearchParams(location.search);
+  let variant = p.get("variant") || "A";
+  if (!VARIANTS.some(v => v.key === variant)) variant = "A";
+  let page = p.get("page") || "dashboard";
+  if (!PAGES.includes(page)) page = "dashboard";
+  return { variant, page };
+}
+function setState(next) {
+  const cur = getState();
+  const merged = { ...cur, ...next };
+  const p = new URLSearchParams();
+  p.set("page", merged.page);
+  p.set("variant", merged.variant);
+  history.replaceState(null, "", "?" + p.toString());
+  render();
+}
+
+/* ---------------------------------------------------------------
+   Renderers
+   --------------------------------------------------------------- */
+function statusDot(status, cls) {
+  return `<span class="${cls} ${status}"></span>`;
+}
+
+function renderA(page) {
+  const active = page === "dashboard";
+  let bar = `<div class="A-bar">
+      <div class="ws ${active ? "active" : ""}">1: dashboard</div>
+      <div class="ws ${!active ? "active" : ""}">2: timeline</div>
+      <div class="spacer"></div>
+      <div class="status">tournaments: <b>${tournaments.length}</b> · running: <b>${tournaments.filter(t=>t.status==='running').length}</b></div>
+    </div>`;
+
+  if (page === "dashboard") {
+    const panes = tournaments.map((t, i) => `
+      <div class="A-pane ${i===0 ? "focused" : ""}">
+        <div class="A-titlebar">
+          <span>${statusDot(t.status, "A-dot")}${t.name}</span>
+          <span class="A-tag">${t.status}</span>
+        </div>
+        <div class="A-body">
+          <div class="kv"><span>${t.dates}</span><span>${t.categories.length} categories</span></div>
+          ${t.categories.map(c => `
+            <div class="A-subpane">
+              <span class="name">${c.name}</span>
+              <span class="meta">${c.entrants} entrants · ${c.stages} stage${c.stages>1?"s":""}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+    return `<div class="A-root">${bar}<div class="A-grid">${panes}</div></div>`;
+  }
+
+  // timeline
+  const d = timelineDetail;
+  const stage1 = `
+    <div class="A-stagecol">
+      <div class="A-titlebar"><span>${d.stage1.name}</span><span class="A-tag">completed</span></div>
+      ${d.stage1.rounds.map(r => `
+        <div class="A-roundpane">
+          <h4>${r.name}</h4>
+          ${r.matches.map(m => `
+            <div class="A-match">
+              <span>[${m.group}] <span class="${m.winner==='a'?"winner":""}">${m.a}</span> vs <span class="${m.winner==='b'?"winner":""}">${m.b}</span></span>
+              <span class="score">${m.score}</span>
+            </div>
+          `).join("")}
+        </div>
+      `).join("")}
+      <div class="A-roundpane">
+        <h4>Standings</h4>
+        ${d.stage1.groups.map(g => `
+          <div class="muted" style="margin-bottom:2px">${g.name}</div>
+          <table class="A-standing">
+            <tr><th>Entrant</th><th>W</th><th>L</th><th>Diff</th></tr>
+            ${g.standing.map(s => `<tr><td>${s.name}</td><td>${s.w}</td><td>${s.l}</td><td>${s.diff}</td></tr>`).join("")}
+          </table>
+        `).join("")}
+      </div>
+    </div>`;
+  const stage2 = `
+    <div class="A-stagecol">
+      <div class="A-titlebar"><span>${d.stage2.name}</span><span class="A-tag">running</span></div>
+      ${d.stage2.rounds.map(r => `
+        <div class="A-roundpane">
+          <h4>${r.name}</h4>
+          ${r.matches.map(m => `
+            <div class="A-match">
+              <span><span class="${m.winner==='a'?"winner":""}">${m.a}</span> vs <span class="${m.winner==='b'?"winner":""}">${m.b}</span></span>
+              <span class="score">${m.score || "pending"}</span>
+            </div>
+            <div class="muted" style="font-size:10px;margin-bottom:4px">${m.from}</div>
+          `).join("")}
+        </div>
+      `).join("")}
+    </div>`;
+  return `<div class="A-root">${bar}
+    <div style="padding:8px 10px 0" class="muted">${d.tournament} / ${d.category}</div>
+    <div class="A-timeline-cols">${stage1}${stage2}</div>
+  </div>`;
+}
+
+function renderB(page) {
+  const totalEntrants = tournaments.reduce((s,t)=>s+t.categories.reduce((s2,c)=>s2+c.entrants,0),0);
+  const topbar = `<div class="B-topbar">
+    <div class="stat">tournaments <b>${tournaments.length}</b></div>
+    <div class="stat">entrants <b>${totalEntrants}</b></div>
+    <div class="stat">running <b>${tournaments.filter(t=>t.status==='running').length}</b></div>
+    <div class="stat muted">${new Date().toLocaleDateString('de-DE')}</div>
+  </div>`;
+
+  if (page === "dashboard") {
+    const rows = tournaments.map(t => {
+      const catCount = t.categories.length;
+      const filled = t.status === "completed" ? 10 : t.status === "running" ? 6 : 0;
+      const bar = "█".repeat(filled) + "░".repeat(10-filled);
+      return `<div class="B-row">
+        <span class="st ${t.status}">${t.status}</span>
+        <span>${t.name} <span class="muted">${t.dates}</span></span>
+        <span class="B-bar">${bar}</span>
+        <span class="muted">${catCount} cats</span>
+        <span class="muted">${t.categories.reduce((s,c)=>s+c.entrants,0)} ent.</span>
+      </div>`;
+    }).join("");
+    return `<div class="B-root">${topbar}
+      <div class="B-panel">
+        <div class="hdr"><span>tournaments</span><span class="muted">sorted by date</span></div>
+        ${rows}
+      </div>
+      ${tournaments.map(t => `
+        <div class="B-panel">
+          <div class="hdr"><span>${t.name} / categories</span><span class="muted">${t.status}</span></div>
+          ${t.categories.map(c => `<div class="B-row" style="grid-template-columns:1fr 90px 90px 60px">
+            <span>${c.name}</span><span class="muted">${c.stages} stage(s)</span><span class="muted">${c.entrants} entrants</span><span></span>
+          </div>`).join("")}
+        </div>
+      `).join("")}
+    </div>`;
+  }
+
+  // timeline: log feed with tree connectors for KO Source, block-bar standings
+  const d = timelineDetail;
+  const groupBlocks = d.stage1.groups.map(g => `
+    <div class="B-group-block">
+      <h5>${g.name}</h5>
+      ${g.standing.map((s,i) => `<div class="B-group-row">
+        <span>${i+1}</span><span>${s.name}</span>
+        <span class="blocks">${"▓".repeat(s.w+1)}${"░".repeat(3-s.w)} ${s.diff}</span>
+      </div>`).join("")}
+    </div>
+  `).join("");
+
+  const stage1feed = d.stage1.rounds.map(r =>
+    `<div class="B-feed-round">## ${r.name}</div>` +
+    r.matches.map(m =>
+      `<div class="B-line"><span class="tree">├─</span> [${m.group}] <span class="p1">${m.a}</span> vs <span class="p2">${m.b}</span> ` +
+      `<span class="win">${m.winner==='a'?'→ '+m.a:m.winner==='b'?'→ '+m.b:''}</span> ` +
+      `<span class="score">${m.score||''}</span></div>`
+    ).join("")
+  ).join("");
+
+  const stage2feed = d.stage2.rounds.map(r =>
+    `<div class="B-feed-round">## ${r.name}</div>` +
+    r.matches.map(m =>
+      `<div class="B-line"><span class="tree">└─</span> <span class="p1">${m.a}</span> vs <span class="p2">${m.b}</span> ` +
+      `<span class="win">${m.score ? (m.winner==='a'?'→ '+m.a:'→ '+m.b) : '(pending)'}</span> ` +
+      `<span class="score">${m.score||''}</span></div>` +
+      `<div class="B-line muted"><span class="tree">&nbsp;&nbsp;&nbsp;</span>&lt;- ${m.from}</div>`
+    ).join("")
+  ).join("");
+
+  return `<div class="B-root">${topbar}
+    <div class="B-panel">
+      <div class="hdr"><span>${d.tournament} / ${d.category}</span><span class="muted">log view</span></div>
+      <div class="B-feed">
+        <div class="B-feed-round" style="color:var(--accent3)">### ${d.stage1.name}</div>
+        ${stage1feed}
+        <div class="B-feed-round" style="color:var(--accent3)">### ${d.stage2.name}</div>
+        ${stage2feed}
+      </div>
+      <div class="B-standing-inline">${groupBlocks}</div>
+    </div>
+  </div>`;
+}
+
+function renderC(page) {
+  if (page === "dashboard") {
+    const totalEntrants = tournaments.reduce((s,t)=>s+t.categories.reduce((s2,c)=>s2+c.entrants,0),0);
+    const stats = `<div class="C-stats">
+      <div class="C-stat"><div class="num">${tournaments.length}</div><div class="lbl">Tournaments</div></div>
+      <div class="C-stat"><div class="num">${tournaments.filter(t=>t.status==='running').length}</div><div class="lbl">Running now</div></div>
+      <div class="C-stat"><div class="num">${totalEntrants}</div><div class="lbl">Entrants total</div></div>
+      <div class="C-stat"><div class="num">${tournaments.reduce((s,t)=>s+t.categories.length,0)}</div><div class="lbl">Categories</div></div>
+    </div>`;
+    const cards = tournaments.map(t => `
+      <div class="C-card ${t.status}">
+        <div class="C-pill">${t.status}</div>
+        <h3>${t.name}</h3>
+        <div class="dates">${t.dates}</div>
+        <div class="C-chip-row">
+          ${t.categories.map(c => `<div class="C-chip">${c.name} <span class="n">${c.entrants}</span></div>`).join("")}
+        </div>
+      </div>
+    `).join("");
+    return `<div class="C-root">${stats}<div class="C-bento">${cards}</div></div>`;
+  }
+
+  // timeline: visual bracket via SVG for stage 2, colorful group cards for stage 1
+  const d = timelineDetail;
+  const groups = d.stage1.groups.map(g => `
+    <div class="C-group-card">
+      <h4>${g.name}</h4>
+      <table class="C-standing">
+        <tr><th>#</th><th>Entrant</th><th>W-L</th><th>Diff</th></tr>
+        ${g.standing.map((s,i) => `<tr><td>${i+1}</td><td>${s.name}</td><td>${s.w}-${s.l}</td><td>${s.diff}</td></tr>`).join("")}
+      </table>
+    </div>
+  `).join("");
+
+  // simple SVG bracket: SF1, SF2 -> Final
+  const sf1 = d.stage2.rounds[0].matches[0];
+  const sf2 = d.stage2.rounds[0].matches[1];
+  const fin = d.stage2.rounds[1].matches[0];
+  const box = (x, y, m) => `
+    <g transform="translate(${x},${y})">
+      <rect width="220" height="54" rx="10" fill="#171f29" stroke="#2a323d"/>
+      <text x="10" y="21" fill="${m.winner==='a' ? 'var(--accent)' : '#d6dde5'}" font-size="13" font-family="Inter,sans-serif">${m.a}</text>
+      <line x1="0" y1="27" x2="220" y2="27" stroke="#2a323d"/>
+      <text x="10" y="45" fill="${m.winner==='b' ? 'var(--accent)' : '#d6dde5'}" font-size="13" font-family="Inter,sans-serif">${m.b}</text>
+      <text x="230" y="32" fill="#7a8494" font-size="12" font-family="monospace">${m.score||'–:–'}</text>
+    </g>`;
+  const svg = `<svg width="640" height="220" viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg">
+    ${box(0, 10, sf1)}
+    ${box(0, 140, sf2)}
+    ${box(380, 75, fin)}
+    <path d="M220 37 H300 V102 H380" stroke="#3a4250" fill="none" stroke-width="2"/>
+    <path d="M220 167 H300 V102 H380" stroke="#3a4250" fill="none" stroke-width="2"/>
+  </svg>`;
+
+  return `<div class="C-root">
+    <div class="C-timeline-head">
+      <h3>${d.tournament} <span class="muted" style="font-weight:400">/ ${d.category}</span></h3>
+    </div>
+    <div class="C-groups">${groups}</div>
+    <div class="C-bracket-wrap">
+      <h4>${d.stage2.name}</h4>
+      ${svg}
+    </div>
+  </div>`;
+}
+
+function render() {
+  const { variant, page } = getState();
+  const app = document.getElementById("app");
+  if (variant === "A") app.innerHTML = renderA(page);
+  else if (variant === "B") app.innerHTML = renderB(page);
+  else app.innerHTML = renderC(page);
+
+  document.querySelectorAll("#page-toggle button").forEach(b => {
+    b.classList.toggle("active", b.dataset.page === page);
+  });
+
+  const idx = VARIANTS.findIndex(v => v.key === variant);
+  document.getElementById("switch-label").innerHTML =
+    `<b>${variant}</b> — ${VARIANTS[idx].name}`;
+}
+
+function cycle(dir) {
+  const { variant } = getState();
+  const idx = VARIANTS.findIndex(v => v.key === variant);
+  const next = VARIANTS[(idx + dir + VARIANTS.length) % VARIANTS.length].key;
+  setState({ variant: next });
+}
+
+document.getElementById("prev").addEventListener("click", () => cycle(-1));
+document.getElementById("next").addEventListener("click", () => cycle(1));
+document.querySelectorAll("#page-toggle button").forEach(b => {
+  b.addEventListener("click", () => setState({ page: b.dataset.page }));
+});
+window.addEventListener("keydown", (e) => {
+  const el = document.activeElement;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+
+render();
+</script>
+</body>
+</html>
