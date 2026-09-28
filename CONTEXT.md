@@ -80,6 +80,10 @@ _Avoid_: Version, edit, change (as the domain term)
 A person who has unlocked edit mode for a Tournament with its shared password. Identified only by a self-declared name, used for attribution (on Result revisions and in conflict messages) — never for authorization. Not a user account; all Editors of a Tournament have equal rights.
 _Avoid_: User, admin, official (as the domain term — an Editor may be an official, but the concept is edit-mode access)
 
+**Organizer**:
+The one role that manages Tournaments rather than working inside one: creates and deletes Tournaments and sets or changes each Tournament's edit password. Unlocked by a single instance-wide password, not a user account. Changing a Tournament's edit password locks out every Editor who unlocked it with the old one.
+_Avoid_: Admin, owner, superuser
+
 **Standing**:
 A Category or Group's ranking of Entrants, computed by that Stage's TournamentSystem from non-voided Results *and* the Entrant roster (status: active/withdrawn) — never stored or materialized. Roster status matters, not just Results: a withdrawn Entrant is placed at the worst remaining position they could still reach, which isn't derivable from Results alone. Not applicable to systems without an ongoing table, like pure single-KO. For round-robin Stages, the DTTB Wettspielordnung's current text ranks by set/ball *differences* (won minus lost), not the "Satzquotient"/"Ballquotient" *ratio* terms common in informal club usage — both are cheap to derive from the same stored won/lost counts, so which one the UI surfaces is a later, not-yet-locked decision, not a schema constraint.
 _Avoid_: Table, ranking, leaderboard
