@@ -63,14 +63,22 @@ A single contest between two Entrants within a Round, with a final Result once p
 _Avoid_: Fixture, game (game is reserved for a set within a Match, not the Match itself, if that granularity is ever modeled)
 
 **Source**:
-A reference describing where one side of a Match comes from — either a fixed Entrant, or the winner (or, for double-KO/continued-KO, the loser) of a specific earlier Match. Lets KO bracket progression, including double-KO's consolation-bracket crossing, be represented explicitly rather than derived from bracket-position arithmetic. When an Entrant withdraws, any not-yet-played Match whose Source resolves to them auto-resolves as a walkover to the opponent — this resolution is generic (not TournamentSystem-specific), since it follows from the Source graph alone.
+A reference describing where one side of a Match comes from — either a fixed Entrant, or the winner (or, for double-KO/continued-KO, the loser) of a specific earlier Match. Lets KO bracket progression, including double-KO's consolation-bracket crossing, be represented explicitly rather than derived from bracket-position arithmetic. When an Entrant withdraws, any not-yet-played Match whose Source resolves to them auto-resolves as a walkover to the opponent — this resolution is generic (not TournamentSystem-specific), since it follows from the Source graph alone. Such walkovers are recorded as Result revisions attributed to the Editor who recorded the withdrawal, marked as caused by it.
 _Avoid_: Feed, link
 
 **Result**:
-The outcome of a completed Match: an ordered set-by-set ball score, a type (played, retired, or walkover), and a winner. A Result can be voided (annulled by the general forfeit rule) without being deleted — a voided Result stays in history but is excluded from Standing. Feeds Standing calculation and, depending on the TournamentSystem, later Rounds'/Stages' Draws or Pairings.
+The outcome of a completed Match: an ordered set-by-set ball score, a type (played, retired, or walkover), and a winner. A Result can be voided (annulled by the general forfeit rule) without being deleted — a voided Result stays in history but is excluded from Standing. Voiding is itself a Result revision, as is clearing a Result recorded by mistake (e.g. on the wrong Match), which returns the Match to unplayed. Clearing is a data-entry correction; voiding is a rule-based annulment — they are not interchangeable. Feeds Standing calculation and, depending on the TournamentSystem, later Rounds'/Stages' Draws or Pairings.
 
 Default withdrawal behavior (applies to KO-family and round-robin): an Entrant's Results in the current Stage are voided, and further Matches depending on them resolve as walkovers via Source resolution. Swiss overrides this default — its results already played stand (not voided), and remaining Rounds are instead credited as explicit walkover losses, per its own scoring rules.
 _Avoid_: Score (Score refers to a single set's ball count, not the Match-level outcome)
+
+**Result revision**:
+One entry in a Match's append-only Result history. Every recording or correction of a Match's Result adds a new revision; earlier revisions are never overwritten. The Match's current Result is its newest revision. Each revision records who made it (an Editor) and when. An Editor recording a Result states which revision they last saw; if a newer one has appeared since, the recording is refused and the Editor is shown the current Result, and must consciously choose to overwrite it. Recording a Result identical to the current one is a no-op, not a conflict.
+_Avoid_: Version, edit, change (as the domain term)
+
+**Editor**:
+A person who has unlocked edit mode for a Tournament with its shared password. Identified only by a self-declared name, used for attribution (on Result revisions and in conflict messages) — never for authorization. Not a user account; all Editors of a Tournament have equal rights.
+_Avoid_: User, admin, official (as the domain term — an Editor may be an official, but the concept is edit-mode access)
 
 **Standing**:
 A Category or Group's ranking of Entrants, computed by that Stage's TournamentSystem from non-voided Results *and* the Entrant roster (status: active/withdrawn) — never stored or materialized. Roster status matters, not just Results: a withdrawn Entrant is placed at the worst remaining position they could still reach, which isn't derivable from Results alone. Not applicable to systems without an ongoing table, like pure single-KO. For round-robin Stages, the DTTB Wettspielordnung's current text ranks by set/ball *differences* (won minus lost), not the "Satzquotient"/"Ballquotient" *ratio* terms common in informal club usage — both are cheap to derive from the same stored won/lost counts, so which one the UI surfaces is a later, not-yet-locked decision, not a schema constraint.
@@ -82,5 +90,5 @@ _Avoid_: Pool, bracket
 
 ## Open questions (not resolved here — belong on the wayfinder map)
 
-- **Edit cascade**: when a completed Round's Result is edited after a later Round's Draw/Pairing already depended on it (e.g. Group Standing seeded a KO Draw), what happens to the later Round? Flagged as a downstream ticket — depends on the conflict-strategy decision, not yet locked.
+- **Edit cascade**: when a completed Round's Result is edited after a later Round's Draw/Pairing already depended on it (e.g. Group Standing seeded a KO Draw), what happens to the later Round? Flagged as a downstream ticket (#6). Concurrency is settled (see Result revision); only the cascade semantics remain open.
 - **Satzquotient vs. Differenz**: see the Standing entry above — not yet locked which term/formula the product surfaces, only that both are derivable from the same stored data.
