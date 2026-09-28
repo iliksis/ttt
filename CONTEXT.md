@@ -5,7 +5,7 @@ A self-hosted application for running a table tennis club's tournaments: organiz
 ## Language
 
 **Tournament**:
-A single event with a name and date(s), containing one or more Categories. Has a lifecycle state: created, running, or completed. The unit shown on the dashboard.
+A single event with a name and date(s), containing one or more Categories. Has a lifecycle state: created, running, or completed. The unit shown on the dashboard. A completed Tournament's Results can't be corrected until an Editor explicitly reopens it (completed → running).
 _Avoid_: Event, competition (as a top-level term)
 
 **Category**:
@@ -47,7 +47,7 @@ One discrete step of a Stage's TournamentSystem, producing a batch of Matches (o
 _Avoid_: Matchday, leg (as a standalone term — matchday may still appear in UI copy for round-robin Rounds, but the underlying concept is Round)
 
 **Draw**:
-The upfront assignment of Entrants to DrawSlots for a Stage (a KO bracket's slots, or a round-robin Stage's Group split), produced by placing the Stage's Seeding into slots per that TournamentSystem's placement rule. For a Swiss Stage, the Draw covers only round-1 seeding — later Rounds are produced as a Pairing instead, since Swiss pairings are recomputed from live standings each Round rather than fixed upfront. A Draw is a historical artifact once made, like a Result: the Seeding it was built from is snapshotted, so a later change to a Player's Q-TTR or a correction to a prior Stage's Result can't retroactively change what an already-made Draw looked like.
+The upfront assignment of Entrants to DrawSlots for a Stage (a KO bracket's slots, or a round-robin Stage's Group split), produced by placing the Stage's Seeding into slots per that TournamentSystem's placement rule. For a Swiss Stage, the Draw covers only round-1 seeding — later Rounds are produced as a Pairing instead, since Swiss pairings are recomputed from live standings each Round rather than fixed upfront. A Draw is a historical artifact once made, like a Result: the Seeding it was built from is snapshotted, so a later change to a Player's Q-TTR or a correction to a prior Stage's Result can't retroactively change what an already-made Draw looked like. If the Seeding it would be built from today differs from its snapshot, the Draw is *stale*. Staleness is computed by comparison, never stored, and only Editors see it. Editors can redraw a stale Draw only while its Stage has no Results; after that, staleness is shown but nothing changes. A Draw is never redrawn automatically. A redraw reuses the lot outcomes from the original snapshot, so only positions affected by the changed Seeding move. The replaced Draw is kept in history with the Editor who redrew it and when.
 _Avoid_: Bracket (as a synonym for Draw — Bracket may still be used loosely in KO-specific UI copy, but the underlying concept is Draw)
 
 **DrawSlot**:
@@ -55,7 +55,7 @@ One position within a Draw — either bound to an Entrant, or a bye. A round-rob
 _Avoid_: Slot (alone), position
 
 **Pairing**:
-A Swiss Round's Entrant-vs-Entrant matchups (from Round 2 onward), computed fresh each Round from the current Standing rather than fixed by a Draw.
+A Swiss Round's Entrant-vs-Entrant matchups (from Round 2 onward), computed fresh each Round from the current Standing rather than fixed by a Draw. Once made, a Pairing is a snapshot like a Draw: if a correction to an earlier Round changes the Standing it was computed from, it becomes stale, and only the latest Round's Pairing can be re-paired, only while that Round has no Results.
 _Avoid_: Draw (Pairing is recomputed per-Round; Draw is fixed upfront)
 
 **Match**:
@@ -63,11 +63,11 @@ A single contest between two Entrants within a Round, with a final Result once p
 _Avoid_: Fixture, game (game is reserved for a set within a Match, not the Match itself, if that granularity is ever modeled)
 
 **Source**:
-A reference describing where one side of a Match comes from — either a fixed Entrant, or the winner (or, for double-KO/continued-KO, the loser) of a specific earlier Match. Lets KO bracket progression, including double-KO's consolation-bracket crossing, be represented explicitly rather than derived from bracket-position arithmetic. When an Entrant withdraws, any not-yet-played Match whose Source resolves to them auto-resolves as a walkover to the opponent — this resolution is generic (not TournamentSystem-specific), since it follows from the Source graph alone. Such walkovers are recorded as Result revisions attributed to the Editor who recorded the withdrawal, marked as caused by it.
+A reference describing where one side of a Match comes from — either a fixed Entrant, or the winner (or, for double-KO/continued-KO, the loser) of a specific earlier Match. Lets KO bracket progression, including double-KO's consolation-bracket crossing, be represented explicitly rather than derived from bracket-position arithmetic. When an Entrant withdraws, any not-yet-played Match whose Source resolves to them auto-resolves as a walkover to the opponent — this resolution is generic (not TournamentSystem-specific), since it follows from the Source graph alone. Such walkovers are recorded as Result revisions attributed to the Editor who recorded the withdrawal, marked as caused by it. Because they're derived rather than entered, they follow Source resolution. Whenever a correction changes who a Source resolves to, withdrawal walkovers are re-checked in the same write: one whose side no longer resolves to a withdrawn Entrant is cleared (a revision marked as caused by that correction), and any newly implied walkover is recorded. A Source resolves through its Match's current winning side even if that Result is voided — voiding only affects Standing.
 _Avoid_: Feed, link
 
 **Result**:
-The outcome of a completed Match: an ordered set-by-set ball score, a type (played, retired, or walkover), and a winner. A Result can be voided (annulled by the general forfeit rule) without being deleted — a voided Result stays in history but is excluded from Standing. Voiding is itself a Result revision, as is clearing a Result recorded by mistake (e.g. on the wrong Match), which returns the Match to unplayed. Clearing is a data-entry correction; voiding is a rule-based annulment — they are not interchangeable. Feeds Standing calculation and, depending on the TournamentSystem, later Rounds'/Stages' Draws or Pairings.
+The outcome of a completed Match: an ordered set-by-set ball score, a type (played, retired, or walkover), and a winning side. The winner is a side of the Match, not an Entrant — which Entrant that is follows from the side's Source. So correcting an earlier Match's winner re-resolves who occupied later Matches without making their Results wrong. A Result can be voided (annulled by the general forfeit rule) without being deleted — a voided Result stays in history but is excluded from Standing. Voiding is itself a Result revision, as is clearing a Result recorded by mistake (e.g. on the wrong Match), which returns the Match to unplayed. Clearing is a data-entry correction; voiding is a rule-based annulment — they are not interchangeable. A Result can't be cleared while any Match fed by it through a Source has a Result of its own; the Editor is shown those Matches and must clear them first, starting from the latest. Only withdrawal walkovers ever cascade automatically (see Source). Feeds Standing calculation and, depending on the TournamentSystem, later Rounds'/Stages' Draws or Pairings.
 
 Default withdrawal behavior (applies to KO-family and round-robin): an Entrant's Results in the current Stage are voided, and further Matches depending on them resolve as walkovers via Source resolution. Swiss overrides this default — its results already played stand (not voided), and remaining Rounds are instead credited as explicit walkover losses, per its own scoring rules.
 _Avoid_: Score (Score refers to a single set's ball count, not the Match-level outcome)
@@ -94,5 +94,4 @@ _Avoid_: Pool, bracket
 
 ## Open questions (not resolved here — belong on the wayfinder map)
 
-- **Edit cascade**: when a completed Round's Result is edited after a later Round's Draw/Pairing already depended on it (e.g. Group Standing seeded a KO Draw), what happens to the later Round? Flagged as a downstream ticket (#6). Concurrency is settled (see Result revision); only the cascade semantics remain open.
 - **Satzquotient vs. Differenz**: see the Standing entry above — not yet locked which term/formula the product surfaces, only that both are derivable from the same stored data.
